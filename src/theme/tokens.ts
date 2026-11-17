@@ -18,12 +18,16 @@ export const colors = {
 } as const;
 
 export const spacing = { xs: 4, sm: 8, md: 16, lg: 24, xl: 40 } as const;
-export const radius = { sm: 4, md: 8, lg: 16 } as const;
+export const radius = { sm: 4, md: 8, lg: 16, pill: 999 } as const;
 
 export const type = {
   display: { fontSize: 40, fontWeight: '800', letterSpacing: -1 },
-  title: { fontSize: 22, fontWeight: '700' },
-  body: { fontSize: 16, lineHeight: 24 },
+  title: { fontSize: 24, fontWeight: '800', letterSpacing: -0.4 },
+  heading: { fontSize: 17, fontWeight: '700' },
+  body: { fontSize: 15, lineHeight: 22 },
   small: { fontSize: 13, lineHeight: 18 },
-  label: { fontSize: 12, fontWeight: '700', letterSpacing: 1.5, textTransform: 'uppercase' },
+  label: { fontSize: 11, fontWeight: '700', letterSpacing: 1.4, textTransform: 'uppercase' },
 } as const;
+
+/** Content never grows wider than this, so grids stay readable on desktop. */
+export const maxContentWidth = 1040;

@@ -34,6 +34,9 @@ These come from the product brief. Enforce them in the database (Row Level Secur
 - Database changes are versioned SQL migrations in `supabase/migrations/`, with RLS enabled on every table.
 - Ratings are stored and computed on 0.1 steps. Do math in whole tenths to avoid float drift.
 - MusicBrainz allows about one request per second per client. Throttle calls. No API key is needed for MusicBrainz or the Cover Art Archive.
+- All Supabase access goes through `src/lib/api.ts`. Reads use views that run with the caller's Row Level Security; multi-step changes use database functions.
+- Keep client queries simple (plain filters, no nested selects) so `tools/local-backend` can keep emulating them.
+- A new table needs three things: RLS enabled with policies, grants in a new migration (see `0006_grants.sql`), and rule tests in `tests/db/`.
 - Before calling a task done, run `npm test` and `npm run typecheck`.
 - Write docs and UI copy without em dashes.
 
@@ -49,3 +52,13 @@ These come from the product brief. Enforce them in the database (Row Level Secur
 | 2026-11-16 | Album scores display to two decimals; equal scores share a rank | Keeps close albums distinct without inventing an order |
 | 2026-11-16 | An album whose tracks are all marked as interludes is never Complete | There is nothing to average |
 | 2026-11-16 | Vitest for unit tests instead of jest-expo | The logic modules are plain TypeScript, so a lighter runner is enough |
+| 2026-11-16 | Same name but different MusicBrainz album asks "is this the same album?" instead of blocking | Some artists have several albums with one name (Weezer) |
+| 2026-11-16 | The shared catalog is written only through `upsert_album` | Nobody can edit an album other people's ratings depend on |
+| 2026-11-16 | You can rate an album only while you have it (own a copy or are borrowing it); existing ratings always stay | Matches "the borrower can rate the record while they have it" |
+| 2026-11-16 | Gift claims are a separate table whose read policy excludes the wisher, and claiming your own item fails exactly like a missing item | The wisher cannot see or probe for a claim |
+| 2026-11-16 | Loan reminders are created when the app opens (14 days out, then at most weekly) | In-app only, and no background scheduler in version one |
+| 2026-11-16 | One family group per person for now | Simplest reading of the brief; lifting it is one index |
+| 2026-11-16 | Grants are revoked and re-granted narrowly in `0006` | Works the same whether or not a Supabase project grants broad table access by default |
+| 2026-11-16 | Database rules are tested with PGlite, and the app end to end through `tools/local-backend` | Real Postgres and real policies with no external account |
+| 2026-11-16 | Moods use MusicBrainz genres plus the person's own ratings and listens | No extra service or key |
+| 2026-11-16 | Song background comes from Wikipedia and is shown only when the article title matches the song | A search can return the wrong page |

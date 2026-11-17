@@ -1,0 +1,41 @@
+# dependencies
+node_modules/
+
+# secrets: never commit real keys. Copy .env.example to .env and paste keys there.
+.env
+.env.*
+!.env.example
+
+# Expo
+.expo/
+dist/
+web-build/
+expo-env.d.ts
+
+# Native
+.kotlin/
+*.orig.*
+*.jks
+*.p8
+*.p12
+*.key
+*.mobileprovision
+*.pem
+
+# Metro
+.metro-health-check*
+
+# debug
+npm-debug.*
+yarn-debug.*
+yarn-error.*
+
+# OS
+.DS_Store
+
+# typescript
+*.tsbuildinfo
+
+# generated native folders
+/ios
+/android

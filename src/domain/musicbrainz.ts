@@ -219,7 +219,7 @@ const EDITION_HINTS: { pattern: RegExp; label: string }[] = [
   { pattern: /\bremaster(ed)?\b/i, label: 'Remastered' },
   { pattern: /\banniversary\b/i, label: 'Anniversary' },
   { pattern: /\bsuper deluxe\b/i, label: 'Super Deluxe' },
-  { pattern: /\b(re-?issue|reissued)\b/i, label: 'Reissue' },
+  { pattern: /\bre[-\u2010\u2011 ]?issued?\b/i, label: 'Reissue' },
   // Live, compilation and demo are NOT guessed from titles: MusicBrainz types
   // cover them, and titles lie ("Live Through This" is a studio album).
 ];
@@ -354,4 +354,94 @@ export function parseTracklist(json: unknown): ParsedTrack[] {
   });
 
   return tracks.sort((a, b) => a.disc - b.disc || a.position - b.position);
+}
+
+// ---------------------------------------------------------------------------
+// Genres (used for moods in "what to play next")
+// ---------------------------------------------------------------------------
+
+/** One album with its genres. */
+export function buildGenresUrl(releaseGroupMbid: string): string {
+  return `${MB_BASE}/release-group/${encodeURIComponent(releaseGroupMbid)}?inc=genres&fmt=json`;
+}
+
+/** Genre names, most voted first, at most `limit`. */
+export function parseGenres(json: unknown, limit = 8): string[] {
+  const genres = (json as { genres?: { name?: string; count?: number }[] } | null)?.genres;
+  if (!Array.isArray(genres)) return [];
+  return genres
+    .filter((g): g is { name: string; count?: number } => typeof g.name === 'string' && g.name.length > 0)
+    .sort((a, b) => (b.count ?? 0) - (a.count ?? 0))
+    .slice(0, limit)
+    .map((g) => g.name.toLowerCase());
+}
+
+// ---------------------------------------------------------------------------
+// Song credits (later phase: song details)
+// ---------------------------------------------------------------------------
+
+interface RawRelation {
+  type?: string;
+  'target-type'?: string;
+  attributes?: string[];
+  artist?: { name?: string };
+  work?: { id?: string; title?: string; relations?: RawRelation[] };
+}
+
+export interface SongCredits {
+  writers: string[];
+  producers: string[];
+  /** e.g. { name: "Mick Fleetwood", roles: ["drums (drum set)", "percussion"] } */
+  players: { name: string; roles: string[] }[];
+  engineers: string[];
+}
+
+/** One recording with who wrote, played on and produced it. */
+export function buildCreditsUrl(recordingMbid: string): string {
+  return `${MB_BASE}/recording/${encodeURIComponent(recordingMbid)}?inc=artist-rels+work-rels+work-level-rels&fmt=json`;
+}
+
+const WRITER_TYPES = new Set(['writer', 'composer', 'lyricist']);
+const PLAYER_TYPES = new Set(['instrument', 'vocal', 'performer', 'performing orchestra', 'conductor']);
+const ENGINEER_TYPES = new Set(['engineer', 'mix', 'recording', 'mastering']);
+
+/** Parses credits from a recording lookup. Names are de-duplicated, order kept. */
+export function parseCredits(json: unknown): SongCredits {
+  const relations = (json as { relations?: RawRelation[] } | null)?.relations;
+  const credits: SongCredits = { writers: [], producers: [], players: [], engineers: [] };
+  if (!Array.isArray(relations)) return credits;
+
+  const add = (list: string[], name: string) => {
+    if (!list.includes(name)) list.push(name);
+  };
+
+  for (const relation of relations) {
+    const type = (relation.type ?? '').toLowerCase();
+    const name = relation.artist?.name;
+    if (relation.work) {
+      for (const workRelation of relation.work.relations ?? []) {
+        const workName = workRelation.artist?.name;
+        if (workName && WRITER_TYPES.has((workRelation.type ?? '').toLowerCase())) add(credits.writers, workName);
+      }
+      continue;
+    }
+    if (!name) continue;
+    if (type === 'producer') add(credits.producers, name);
+    else if (ENGINEER_TYPES.has(type)) add(credits.engineers, name);
+    else if (PLAYER_TYPES.has(type)) {
+      const roles = relation.attributes && relation.attributes.length > 0 ? relation.attributes : [type === 'vocal' ? 'vocals' : type];
+      const existing = credits.players.find((p) => p.name === name);
+      if (existing) roles.forEach((r) => add(existing.roles, r));
+      else credits.players.push({ name, roles: [...roles] });
+    }
+  }
+  return credits;
+}
+
+/**
+ * Lyrics are never shown or stored in Crate. This builds a link out to a
+ * search on Genius, a licensed lyrics site.
+ */
+export function lyricsSearchUrl(artist: string, title: string): string {
+  return `https://genius.com/search?q=${encodeURIComponent(`${artist} ${title}`)}`;
 }

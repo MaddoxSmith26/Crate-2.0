@@ -27,8 +27,14 @@ describe('checkDuplicate', () => {
     expect(result.kind).toBe('owned');
   });
 
-  it('catches a title match even when the IDs differ (another release group of the same album)', () => {
-    const result = checkDuplicate({ mbid: 'mb-other', artist: 'pink floyd', title: 'DARK SIDE OF THE MOON' }, [known({})]);
+  it('asks instead of assuming when the name matches but MusicBrainz says it is a different album', () => {
+    const blue = known({ albumId: 'blue', mbid: 'mb-weezer-blue', artist: 'Weezer', title: 'Weezer' });
+    const result = checkDuplicate({ mbid: 'mb-weezer-green', artist: 'Weezer', title: 'Weezer' }, [blue]);
+    expect(result).toMatchObject({ kind: 'possible', album: { albumId: 'blue' } });
+  });
+
+  it('catches a manual entry of an album already owned from search', () => {
+    const result = checkDuplicate({ mbid: null, artist: 'pink floyd', title: 'DARK SIDE OF THE MOON' }, [known({})]);
     expect(result.kind).toBe('owned');
   });
 

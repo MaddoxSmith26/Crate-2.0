@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import {
+  lyricsSearchUrl,
+  parseCredits,
+  parseGenres,
   buildAlbumSearchUrl,
   buildEditionsUrl,
   buildTracklistUrl,
@@ -261,5 +264,46 @@ describe('parseTracklist', () => {
   it('returns nothing for junk input', () => {
     expect(parseTracklist(null)).toEqual([]);
     expect(parseTracklist({ media: 'nope' })).toEqual([]);
+  });
+});
+
+describe('genres, credits and lyrics link', () => {
+  it('lists genres most voted first, lowercased', () => {
+    const json = { genres: [{ name: 'Blues', count: 6 }, { name: 'rock', count: 14 }, { name: 'soft rock', count: 11 }, { count: 3 }] };
+    expect(parseGenres(json)).toEqual(['rock', 'soft rock', 'blues']);
+    expect(parseGenres(json, 1)).toEqual(['rock']);
+    expect(parseGenres(null)).toEqual([]);
+  });
+
+  it('groups credits into writers, producers, players and engineers', () => {
+    const credits = parseCredits({
+      relations: [
+        { type: 'engineer', 'target-type': 'artist', attributes: [], artist: { name: 'Ken Caillat' } },
+        { type: 'instrument', 'target-type': 'artist', attributes: ['guitar'], artist: { name: 'Lindsey Buckingham' } },
+        { type: 'instrument', 'target-type': 'artist', attributes: ['drums (drum set)', 'percussion'], artist: { name: 'Mick Fleetwood' } },
+        { type: 'vocal', 'target-type': 'artist', attributes: ['lead vocals'], artist: { name: 'Stevie Nicks' } },
+        { type: 'vocal', 'target-type': 'artist', attributes: [], artist: { name: 'Lindsey Buckingham' } },
+        { type: 'producer', 'target-type': 'artist', attributes: [], artist: { name: 'Ken Caillat' } },
+        { type: 'producer', 'target-type': 'artist', attributes: ['additional'], artist: { name: 'Ken Caillat' } },
+        { type: 'performance', 'target-type': 'work', work: { id: 'w1', title: 'Dreams', relations: [{ type: 'writer', artist: { name: 'Stevie Nicks' } }, { type: 'publishing', artist: { name: 'Some Publisher' } }] } },
+      ],
+    });
+    expect(credits.writers).toEqual(['Stevie Nicks']);
+    expect(credits.producers).toEqual(['Ken Caillat']);
+    expect(credits.engineers).toEqual(['Ken Caillat']);
+    expect(credits.players).toEqual([
+      { name: 'Lindsey Buckingham', roles: ['guitar', 'vocals'] },
+      { name: 'Mick Fleetwood', roles: ['drums (drum set)', 'percussion'] },
+      { name: 'Stevie Nicks', roles: ['lead vocals'] },
+    ]);
+    expect(parseCredits({})).toEqual({ writers: [], producers: [], players: [], engineers: [] });
+  });
+
+  it('links out for lyrics instead of holding them', () => {
+    expect(lyricsSearchUrl('Fleetwood Mac', 'Dreams')).toBe('https://genius.com/search?q=Fleetwood%20Mac%20Dreams');
+  });
+
+  it('treats a typographic hyphen in "re\u2010issue" as a reissue hint', () => {
+    expect(detectEditionHints('re\u2010issue, marked Fabricado em Portugal')).toEqual(['Reissue']);
   });
 });

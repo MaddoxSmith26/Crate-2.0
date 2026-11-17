@@ -31,11 +31,22 @@ export type DuplicateCheck =
   /** Already owned: warn, and offer "add another pressing" only. */
   | { kind: 'owned'; album: KnownAlbum }
   /** Owned before and removed: adding a copy brings back the same album and its history. */
-  | { kind: 'previously_owned'; album: KnownAlbum };
+  | { kind: 'previously_owned'; album: KnownAlbum }
+  /**
+   * Same artist and title as an owned album, but a different MusicBrainz
+   * album. Usually a self-titled sequel (Weezer has several albums called
+   * "Weezer"). The UI asks instead of assuming.
+   */
+  | { kind: 'possible'; album: KnownAlbum };
 
-function matches(candidate: AlbumIdentity, known: AlbumIdentity): boolean {
-  if (candidate.mbid && known.mbid && candidate.mbid === known.mbid) return true;
-  return albumKey(candidate.artist, candidate.title) === albumKey(known.artist, known.title);
+type Match = 'exact' | 'same_name' | 'none';
+
+function match(candidate: AlbumIdentity, known: AlbumIdentity): Match {
+  if (candidate.mbid && known.mbid && candidate.mbid === known.mbid) return 'exact';
+  if (albumKey(candidate.artist, candidate.title) !== albumKey(known.artist, known.title)) return 'none';
+  // Same name. If both sides have MusicBrainz IDs and they differ, MusicBrainz
+  // says these are different albums, so it is only a possible duplicate.
+  return candidate.mbid && known.mbid ? 'same_name' : 'exact';
 }
 
 /**
@@ -43,10 +54,12 @@ function matches(candidate: AlbumIdentity, known: AlbumIdentity): boolean {
  * A currently owned match wins over a previously owned one.
  */
 export function checkDuplicate(candidate: AlbumIdentity, known: readonly KnownAlbum[]): DuplicateCheck {
-  const hits = known.filter((k) => matches(candidate, k));
-  const owned = hits.find((k) => k.activeCopies > 0);
+  const exact = known.filter((k) => match(candidate, k) === 'exact');
+  const owned = exact.find((k) => k.activeCopies > 0);
   if (owned) return { kind: 'owned', album: owned };
-  const previous = hits.find((k) => k.removedCopies > 0);
+  const previous = exact.find((k) => k.removedCopies > 0);
   if (previous) return { kind: 'previously_owned', album: previous };
+  const sameName = known.find((k) => match(candidate, k) === 'same_name' && k.activeCopies > 0);
+  if (sameName) return { kind: 'possible', album: sameName };
   return { kind: 'new' };
 }
